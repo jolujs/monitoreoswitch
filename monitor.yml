@@ -1,0 +1,46 @@
+name: Monitor stock Switch 2 Zelda
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # cada 5 min (GitHub puede atrasarlo unos minutos)
+  workflow_dispatch:         # botón para ejecutarlo a mano
+
+concurrency:               # nunca dos revisiones a la vez (evita llamadas dobles)
+  group: monitor-stock
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Recuperar estado anterior
+        uses: actions/cache/restore@v4
+        with:
+          path: .estado_stock.json
+          key: estado-${{ github.run_id }}
+          restore-keys: estado-
+      - name: Revisar stock
+        env:
+          TZ: America/Santiago   # horas del status en hora de Chile
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CALLMEBOT_USER: ${{ secrets.CALLMEBOT_USER }}
+          ML_CLIENT_ID: ${{ secrets.ML_CLIENT_ID }}
+          ML_CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
+          PRODUCT_ID: ${{ vars.PRODUCT_ID || 'MLC79375219' }}
+          PRODUCT_NAME: ${{ vars.PRODUCT_NAME || 'Nintendo Switch 2 Zelda 40th Anniversary' }}
+          PRODUCT_URL: ${{ vars.PRODUCT_URL }}
+          RESUMEN_CADA_MIN: ${{ vars.RESUMEN_CADA_MIN || '60' }}
+          MENSAJES_POR_AVISO: ${{ vars.MENSAJES_POR_AVISO || '5' }}
+        run: python monitor_stock.py --once
+      - name: Guardar estado
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .estado_stock.json
+          key: estado-${{ github.run_id }}
